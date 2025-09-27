@@ -2,7 +2,7 @@
 
 Convert Amstrad NC100 Notepad screenshots to a more useful format: BMP. These can then be scaled in almost any modern graphics package and manipulated as required.
 
-![Amstrad NC100 Notepad. Image (c) 2025, Tony Smith. All rights reserved](./images/img_0157.webp)
+![Amstrad NC100 Notepad. Image (c) 2025, Tony Smith. All rights reserved](./images/nc100hw.webp)
 
 Also included is source code for a PCX conversion utility. Though modified by me, this was originally published in the 1993 book *The Amstrad Notepad Advanced User Guide*, produced by Sigma Press and written by Robin Nixon. The original code itself was written by Chris Nixon for Borland Turbo C running on DOS/Windows 3 machines. I have updated and commented Chris’ code. It is included here because it was the direct inspiration for `notepad2bmp`.
 
