@@ -74,6 +74,7 @@ int main (int argc, char *argv[] ) {
     FILE *source_file, *bmp_file;
     int byte;
     char data[4096] = {0};
+    char scaled[34560] = {0};
 
     // Insufficient args? Print help
     if (argc < 3 || argc > 3 ) {
@@ -118,7 +119,7 @@ int main (int argc, char *argv[] ) {
 
     // Write out the rows: BMP
     for (int row = 0 ; row < 64 ; ++row) {
-        // Include the padding rows
+        // Exclude the padding rows
         for (int col = 0 ; col < 60 ; ++col) {
             // Read in the byte from the bottom rather than the
             // top of the array, to match BMP pixel order
