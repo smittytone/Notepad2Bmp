@@ -53,7 +53,7 @@ int main (int argc, char *argv[] ) {
 
     // Insufficient args? Print help
     if (argc < 3 || argc > 3 ) {
-        printf("Type: notepad2pcx filename filename\n");
+        printf("Usage: notepad2pcx {source filename} {output filename}\n");
         exit(0);
     }
 
