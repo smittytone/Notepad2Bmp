@@ -32,7 +32,9 @@ Copy the screenshot to your computer using XModem transfer, then run:
 notepad2bmp s.a screenshot.bmp
 ```
 
-**Note** A sample `s.a` file is included in the [`samples`](/samples) directory.
+**Note** A sample `s.a` file is included in the [`samples`](/samples) directory:
+
+![Converted sample](./images/nc100.bmp)
 
 ## Legal
 
