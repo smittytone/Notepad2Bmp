@@ -37,32 +37,38 @@ void output_header(const char* data, FILE *output, unsigned int count) ;
 
 /*
     BMP HEADER DATA
-    These are stock values for the size and type of file we are generating.
+    These are stock values for the size and type of file we are generating. They comprise:
+
+    1. BMP general header
+    2. Device-independent bitmap header
+    3. Colour look-up table
+
+    For more on the BMP format see https://en.wikipedia.org/wiki/BMP_file_format
 */
 const char BMP_HEADER[14] = {
-    0x42,0x4D,                  // TYPE
-    0x3E,0x10,0x00,0x00,        // SIZE 4096+14+40+8
-    0x00,0x00,0x00,0x00,        // ZEROS
-    0x3E,0x00,0x00,0x00         // Offset to the data 14+40+8
+    0x42,0x4D,                  // TYPE (BM>
+    0x3E,0x10,0x00,0x00,        // FILE SIZE (4096+14+40+8)
+    0x00,0x00,0x00,0x00,
+    0x3E,0x00,0x00,0x00         // Offset to the pixel data (14+40+8)
 };
 
 const char DIB_HEADER[40] = {
-    0x28,0x00,0x00,0x00,        // HS 40 0x28
-    0xE0,0x01,0x00,0x00,        // W 480 0x01E0
-    0x40,0x00,0x00,0x00,        // H 64  0x40
-    0x01,0x00,                  // CLR PLANE 1
-    0x01,0x00,                  // BPP 1
-    0x00,0x00,0x00,0x00,        // COMP
-    0x00,0x10,0x00,0x00,        // DATA SIZE 4096
-    0x13,0x0B,0x00,0x00,        // H DPI 72
-    0x13,0x0B,0x00,0x00,        // V DPI 72
-    0x02,0x00,0x00,0x00,        // PALETTE COLOURS
-    0x00,0x00,0x00,0x00         // ALL IMPORTANT
+    0x28,0x00,0x00,0x00,        // HEADER SIZE (40 bytes)
+    0xE0,0x01,0x00,0x00,        // IMAGE WIDTH (480)
+    0x40,0x00,0x00,0x00,        // IMAGE HEIGHT (64)
+    0x01,0x00,                  // COLOUR PLANES (1)
+    0x01,0x00,                  // BITS PER PIXEL (1)
+    0x00,0x00,0x00,0x00,
+    0x00,0x10,0x00,0x00,        // DATA SIZE (4096)
+    0x13,0x0B,0x00,0x00,        // HORIZONTAL RESOLUTION in DOTS PER METRE (calculated from 72dpi)
+    0x13,0x0B,0x00,0x00,        // VERTICAL RESOLUTION in DOTS PER METRE (calculated from 72dpi)
+    0x02,0x00,0x00,0x00,        // NO. COLOURS IN THE PALETTE
+    0x00,0x00,0x00,0x00         // IMPORTANT COLOURS (0 = ALL)
 };
 
 const char BMP_CLT[8] = {
-    0x00,0x00,0x00,0x00,
-    0x00,0x00,0xFF,0x00
+    0xFF,0xFF,0xFF,0x00,        // WHITE IN BGRA
+    0x00,0x00,0x00,0x00         // BLACK IN BGRA
 };
 
 
@@ -78,7 +84,7 @@ int main (int argc, char *argv[] ) {
 
     // Insufficient args? Print help
     if (argc < 3 || argc > 3 ) {
-        printf("Usage: ncbmp {source filename} {output filename}\n");
+        printf("Usage: notepad2bmp {source filename} {output filename}\n");
         exit(0);
     }
 
@@ -122,7 +128,7 @@ int main (int argc, char *argv[] ) {
         // Exclude the padding rows
         for (int col = 0 ; col < 60 ; ++col) {
             // Read in the byte from the bottom rather than the
-            // top of the array, to match BMP pixel order
+            // top of the array, as BMP reverses Amstrad's row order
             byte = data[(63 - row) * 64 + col];
             fputc(byte, bmp_file);
         }
