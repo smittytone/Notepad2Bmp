@@ -67,6 +67,7 @@ const char DIB_HEADER[40] = {
 };
 
 const char BMP_CLT[8] = {
+    //0x70,0x9D,0xA8,0x00,        // LCD GREEN IN BGRA
     0xFF,0xFF,0xFF,0x00,        // WHITE IN BGRA
     0x00,0x00,0x00,0x00         // BLACK IN BGRA
 };

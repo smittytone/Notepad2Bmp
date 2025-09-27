@@ -36,6 +36,14 @@ notepad2bmp s.a screenshot.bmp
 
 ![Converted sample](./images/nc100.bmp)
 
+**Fun Tweak**
+
+I've included in the code’s colour look-up data, pixel colouring for that old-fashioned LCD screen look:
+
+![Converted sample in LCD colouring](./images/lcd.bmp)
+
+Just comment out the `WHITE` line in the code, and uncomment the `LCD` line.
+
 ## Legal
 
 This software copyright © 2025, Tony Smith (@smittytone). It is licensed under the terms of the [MIT Licence](LICENCE.md).
