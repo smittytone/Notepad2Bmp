@@ -24,7 +24,7 @@ sudo mv notepad2bmp /usr/local/bin
 
 ## Usage
 
-Grab a screen on the NC100 using **Symbol**-**Shift**-**S**. This will save a file named `s.a` in memory. Note that the extension, but not the file name, changes with each new screenshot.
+Grab a screen on the NC100 using **Control**-**Shift**-**S**. This will save a file named `s.a` in memory. Note that the extension, but not the file name, changes with each new screenshot: it will run through valid Ascii characters, ie. `s.a`, `s.b`, `s.c` etc.
 
 Copy the screenshot to your computer using XModem transfer, then run:
 
