@@ -94,7 +94,7 @@ char DIB_V1_HEADER[40] = {
 };
 
 char DIB_V4_HEADER[108] = {
-    0x7C,0x00,0x00,0x00,        // HEADER SIZE (108 bytes)
+    0x6C,0x00,0x00,0x00,        // HEADER SIZE (108 bytes)
     0xE0,0x01,0x00,0x00,        // IMAGE WIDTH (480)
     0x40,0x00,0x00,0x00,        // IMAGE HEIGHT (64)
     0x01,0x00,                  // COLOUR PLANES (1)
@@ -180,7 +180,9 @@ int main (int argc, char *argv[] ) {
 
     // Insufficient args? Print help
     if (argc < 3 || argc > 4 ) {
-        printf("Usage: notepad2bmp {source filename} {output filename}\n");
+        printf("notepad2bmp 0.2.0\n");
+        printf("Copyright © 2025, Tony Smith (@smittytone). Source code available under the MIT licence.\n");
+        printf("Usage: notepad2bmp {source filename} {output filename} [--rawsize]\n");
         exit(0);
     }
 
@@ -301,6 +303,8 @@ void output_header_bytes(const char* data, FILE *output, unsigned int count) {
     Upscale pixel data.
     Currently we scale only by a factor of 3 (72dpi to 216dpi).
 
+    FROM 0.2.0
+
     - Parameters:
         - data: Pointer to the raw bit per pixel data.
         - dest: Pointer to the scaled byte per pixel data.
@@ -328,9 +332,8 @@ void scale(char* data, char* dest) {
     // Delta values cover the eight bytes neighbouring the destination
     // byte mapped to a byte in the source buffer
     const int delta[9] = {-1441, -1440, -1439, -1, 0, 1, 1439, 1440, 1441};
-    //char* destPtr = dest;
+    char* destPtr = dest;
     ptr = tmp;
-    int start = 0;
 
     for (unsigned int i = 0 ; i < UNSCALED_DATA_SIZE ; ++i) {
         char byte = *ptr;
@@ -338,22 +341,16 @@ void scale(char* data, char* dest) {
 
         if (i % UNSCALED_WIDTH == 0) {
             // On a new row, so move the pointer on three whole rows
-            //destPtr = dest + (((i / UNSCALED_WIDTH) * SCALE_FACTOR) + 1) * SCALED_WIDTH;
-            start = (((i / UNSCALED_WIDTH) * SCALE_FACTOR) + 1) * SCALED_WIDTH;
+            destPtr = dest + (((i / UNSCALED_WIDTH) * SCALE_FACTOR) + 1) * SCALED_WIDTH;
         } else {
-            //destPtr += 3;
-            start += 3;
+            destPtr += 3;
         }
 
         // Fill in the neighbours in the destination buffer
         for (unsigned int j = 0; j < 9 ; ++j) {
-            //char* neighbourPtr = destPtr + delta[j];
-            int index = start + delta[j];
-            //if (neighbourPtr < dest + SCALED_DATA_SIZE) {
-            //    *neighbourPtr = byte;
-            //}
-            if (index < SCALED_DATA_SIZE) {
-                dest[index] = byte;
+            char* neighbourPtr = destPtr + delta[j];
+            if (neighbourPtr < dest + SCALED_DATA_SIZE) {
+                *neighbourPtr = byte;
             }
         }
     }
