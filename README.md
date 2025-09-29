@@ -26,7 +26,7 @@ sudo mv notepad2bmp /usr/local/bin
 
 Grab a screen on the NC100 using **Control**-**Shift**-**S**. This will save a file named `s.a` in memory. Note that the extension, but not the file name, changes with each new screenshot: it will run through valid Ascii characters, ie. `s.a`, `s.b`, `s.c` etc.
 
-Copy the screenshot to your computer using XModem transfer, then run:
+Copy the screenshot to your computer using xmodem transfer, then run:
 
 ```shell
 notepad2bmp s.a screenshot.bmp
@@ -35,6 +35,12 @@ notepad2bmp s.a screenshot.bmp
 **Note** A sample `s.a` file is included in the [`samples`](/samples) directory:
 
 ![Converted sample](./images/nc100.bmp)
+
+By default, the code upscales the image from 480x64 (72dpi) to 1440x192 (216dpi). If you would prefer to work with the image at its native size, just add the `-r` or `--rawsize` flag:
+
+```shell
+notepad2bmp s.a screenshot.bmp --rawsize
+```
 
 **Fun Tweak**
 
