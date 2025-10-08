@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 
 /*
@@ -180,7 +181,7 @@ int main (int argc, char *argv[] ) {
     char data[RAW_DATA_SIZE] = {0};
     // FROM 0.2.0
     char scaled[SCALED_DATA_SIZE] = {0};
-    char do_scale = 1;
+    bool do_scale = true;
 
     // Insufficient args? Print help
     if (argc < 2 || argc > 4 ) {
@@ -197,7 +198,7 @@ int main (int argc, char *argv[] ) {
     if (argc == 4) {
         for (unsigned int i = 1 ; i < 4 ; ++i) {
             if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--rawsize") == 0) {
-                do_scale = 0;
+                do_scale = false;
                 break;
             }
         }
@@ -215,7 +216,7 @@ int main (int argc, char *argv[] ) {
         // FROM 0.3.0
         // Make sure the supplied destination file name ends in '.bmp'
         char* bmp_file_name = NULL;
-        int do_release = 0;
+        bool do_release = false;
 
         if (strstr(argv[2], ".bmp") == NULL) {
             // NOTE Above call succeeds on first `.bmp` found, so we'll currently
@@ -226,27 +227,29 @@ int main (int argc, char *argv[] ) {
             bmp_file_name = calloc(strlen(argv[2]) + 5, sizeof(char));
             strcpy(bmp_file_name, argv[2]);
             strcpy(&bmp_file_name[strlen(argv[2])], ".bmp");
-            do_release = 1;
+            do_release = true;
         } else {
             // It does end in '.bmp'
             bmp_file_name = argv[2];
         }
 
         bmp_file = fopen (bmp_file_name, "wb");
-        if (do_release == 1) free(bmp_file_name);
         if (bmp_file == NULL) {
             printf("[ERROR] Cannot create file %s.\n" , bmp_file_name);
+            if (do_release) free(bmp_file_name);
             exit(1);
         }
+
+        // Release the file name memory if we allocated some for it
+        if (do_release) free(bmp_file_name);
     }
 
     // FROM 0.3.0
     // Use the source file as the basis for the destination file name
     // if no destination file name is provided
     if (bmp_file == NULL) {
-        char* bmp_file_name = NULL;
+        // Determine the length of the source filename minus any extension
         int length = 0;
-
         const char* result = strchr(argv[1], '.');
         if (result != NULL) {
             length = result - argv[1];
@@ -254,16 +257,22 @@ int main (int argc, char *argv[] ) {
             length = strlen(argv[1]);
         }
 
-        bmp_file_name = calloc(length + 5, sizeof(char));
+        // Allocate zeroed memory for the name and write in the source
+        // name and then append the standard file extension
+        char* bmp_file_name = calloc(length + 5, sizeof(char));
         strncpy(bmp_file_name, argv[1], length);
         strcpy(&bmp_file_name[0] + length, ".bmp");
 
+        // Open up a file with the new file name
         bmp_file = fopen (bmp_file_name, "wb");
-        free(bmp_file_name);
         if (bmp_file == NULL) {
             printf("[ERROR] Cannot create file %s.\n" , bmp_file_name);
+            free(bmp_file_name);
             exit(1);
         }
+
+        // Free the allocated file name memory
+        free(bmp_file_name);
     }
 
     // Read in the Amstrad screen grab data
@@ -282,7 +291,7 @@ int main (int argc, char *argv[] ) {
     // Close the source file
     fclose(source_file);
 
-    if (do_scale == 1) {
+    if (do_scale) {
         // Change BMP header values to match the scaled image
         unsigned int size = SCALED_DATA_SIZE + BMP_V5_HEADER_DATA_SIZE;
         BMP_HEADER[BMP_HEADER_FILE_SIZE_INDEX]     = (char)(size & 0xFF);;
@@ -311,7 +320,7 @@ int main (int argc, char *argv[] ) {
     output_header_bytes(DIB_V5_HEADER, bmp_file, 124);
     output_header_bytes(BMP_CLT, bmp_file, 8);
 
-    if (do_scale == 1) {
+    if (do_scale) {
         // Upscale the image using nearest neighbour mode
         scale(data, scaled);
 
