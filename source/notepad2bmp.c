@@ -3,7 +3,7 @@
 
     Copyright © 2025 Tony Smith. All rights reserved.
 
-    Version 0.2.0
+    Version 0.3.0
 
     MIT License
     Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -34,32 +34,32 @@
 /*
     CONSTANTS
 */
-#define RAW_DATA_SIZE 4096
-#define UNSCALED_WIDTH 480
-#define UNSCALED_HEIGHT 64
-#define UNSCALED_DATA_SIZE (UNSCALED_WIDTH * UNSCALED_HEIGHT)
-#define SCALE_FACTOR 3
-#define SCALED_WIDTH (UNSCALED_WIDTH * SCALE_FACTOR)
-#define SCALED_HEIGHT (UNSCALED_HEIGHT * SCALE_FACTOR)
-#define SCALED_DATA_SIZE (SCALED_WIDTH * SCALED_HEIGHT)
+#define RAW_DATA_SIZE                           4096
+#define UNSCALED_WIDTH                          480
+#define UNSCALED_HEIGHT                         64
+#define UNSCALED_DATA_SIZE                      (UNSCALED_WIDTH * UNSCALED_HEIGHT)
+#define SCALE_FACTOR                            3
+#define SCALED_WIDTH                            (UNSCALED_WIDTH * SCALE_FACTOR)
+#define SCALED_HEIGHT                           (UNSCALED_HEIGHT * SCALE_FACTOR)
+#define SCALED_DATA_SIZE                        (SCALED_WIDTH * SCALED_HEIGHT)
 
-#define BMP_V1_HEADER_DATA_SIZE 62
-#define BMP_V5_HEADER_DATA_SIZE 146
+#define BMP_V1_HEADER_DATA_SIZE                 62
+#define BMP_V5_HEADER_DATA_SIZE                 146
 
-#define BMP_HEADER_FILE_SIZE_INDEX 2
-#define DIB_V5_HEADER_WIDTH_INDEX 4
-#define DIB_V5_HEADER_HEIGHT_INDEX 8
-#define DIB_V5_HEADER_BITS_PER_PIXEL_INDEX 14
-#define DIB_V5_HEADER_DATA_SIZE_INDEX 20
-#define DIB_V5_HEADER_H_RESOLUTION_INDEX 24
-#define DIB_V5_HEADER_V_RESOLUTION_INDEX 28
+#define BMP_HEADER_FILE_SIZE_INDEX              2
+#define DIB_V5_HEADER_WIDTH_INDEX               4
+#define DIB_V5_HEADER_HEIGHT_INDEX              8
+#define DIB_V5_HEADER_BITS_PER_PIXEL_INDEX      14
+#define DIB_V5_HEADER_DATA_SIZE_INDEX           20
+#define DIB_V5_HEADER_H_RESOLUTION_INDEX        24
+#define DIB_V5_HEADER_V_RESOLUTION_INDEX        28
 
 
 /*
     FORWARD DECLARATIONS
 */
-void output_header_bytes(const char* data, FILE *output, unsigned int count);
-void scale(char* data, char* dest);
+void output_header_bytes(const char* data, FILE *outfile, unsigned int byteCount);
+void scale(char* source, char* destination);
 
 
 /*
@@ -79,6 +79,7 @@ char BMP_HEADER[14] = {
     0x92,0x00,0x00,0x00         // Offset to the pixel data (14+40+8)
 };
 
+/*
 char DIB_V1_HEADER[40] = {
     0x28,0x00,0x00,0x00,        // HEADER SIZE (40 bytes)
     0xE0,0x01,0x00,0x00,        // IMAGE WIDTH (480)
@@ -123,6 +124,7 @@ char DIB_V4_HEADER[108] = {
     0x00,0x00,0x00,0x00,        // G GAMMA
     0x00,0x00,0x00,0x00,        // B GAMMA
 };
+*/
 
 char DIB_V5_HEADER[124] = {
     0x7C,0x00,0x00,0x00,        // HEADER SIZE (124 bytes)
@@ -159,6 +161,8 @@ char DIB_V5_HEADER[124] = {
     0x00,0x00,0x00,0x00         // RESERVED
 };
 
+// This CLT contains two colours: white and black
+// (plus an optional 'LCD green' alternative for white)
 const char BMP_CLT[8] = {
     //0x70,0x9D,0xA8,0x00,      // LCD GREEN IN BGRA
     0xFF,0xFF,0xFF,0x00,        // WHITE IN BGRA
@@ -171,18 +175,20 @@ const char BMP_CLT[8] = {
 */
 int main (int argc, char *argv[] ) {
 
-    FILE *source_file, *bmp_file;
-    int byte;
+    FILE* source_file = NULL;
+    FILE* bmp_file = NULL;
     char data[RAW_DATA_SIZE] = {0};
     // FROM 0.2.0
     char scaled[SCALED_DATA_SIZE] = {0};
     char do_scale = 1;
 
     // Insufficient args? Print help
-    if (argc < 3 || argc > 4 ) {
-        printf("notepad2bmp 0.2.0\n");
+    if (argc < 2 || argc > 4 ) {
+        printf("notepad2bmp 0.3.0\n");
         printf("Copyright © 2025, Tony Smith (@smittytone). Source code available under the MIT licence.\n");
-        printf("Usage: notepad2bmp {source filename} {output filename} [--rawsize]\n");
+        printf("Usage: notepad2bmp {source filename} [output filename] [--rawsize]\n");
+        printf("If no output filename is provided, the name of the source file is used.\n");
+        printf("If no output filename extension is provided, .bmp is added.\n");
         exit(0);
     }
 
@@ -205,10 +211,59 @@ int main (int argc, char *argv[] ) {
     }
 
     // Open the destination file if we can
-    bmp_file = fopen (argv[2], "wb");
+    if (argc >= 3) {
+        // FROM 0.3.0
+        // Make sure the supplied destination file name ends in '.bmp'
+        char* bmp_file_name = NULL;
+        int do_release = 0;
+
+        if (strstr(argv[2], ".bmp") == NULL) {
+            // NOTE Above call succeeds on first `.bmp` found, so we'll currently
+            //      not come here on files ending in, say, `.bmp.xxx`. We should
+            //      really check that the file ENDS in `.bmp`.
+
+            // It does not end in '.bmp' so add it
+            bmp_file_name = calloc(strlen(argv[2]) + 5, sizeof(char));
+            strcpy(bmp_file_name, argv[2]);
+            strcpy(&bmp_file_name[strlen(argv[2])], ".bmp");
+            do_release = 1;
+        } else {
+            // It does end in '.bmp'
+            bmp_file_name = argv[2];
+        }
+
+        bmp_file = fopen (bmp_file_name, "wb");
+        if (do_release == 1) free(bmp_file_name);
+        if (bmp_file == NULL) {
+            printf("[ERROR] Cannot create file %s.\n" , bmp_file_name);
+            exit(1);
+        }
+    }
+
+    // FROM 0.3.0
+    // Use the source file as the basis for the destination file name
+    // if no destination file name is provided
     if (bmp_file == NULL) {
-        printf("[ERROR] Cannot create file %s.\n" , argv[2]);
-        exit(1);
+        char* bmp_file_name = NULL;
+        int length = 0;
+
+        const char* result = strchr(argv[1], '.');
+        if (result != NULL) {
+            length = result - argv[1];
+        } else {
+            length = strlen(argv[1]);
+        }
+
+        bmp_file_name = calloc(length + 5, sizeof(char));
+        strncpy(bmp_file_name, argv[1], length);
+        strcpy(&bmp_file_name[0] + length, ".bmp");
+
+        bmp_file = fopen (bmp_file_name, "wb");
+        free(bmp_file_name);
+        if (bmp_file == NULL) {
+            printf("[ERROR] Cannot create file %s.\n" , bmp_file_name);
+            exit(1);
+        }
     }
 
     // Read in the Amstrad screen grab data
@@ -249,7 +304,6 @@ int main (int argc, char *argv[] ) {
         DIB_V5_HEADER[DIB_V5_HEADER_H_RESOLUTION_INDEX + 1] = 0x21;
         DIB_V5_HEADER[DIB_V5_HEADER_V_RESOLUTION_INDEX]     = 0x38;
         DIB_V5_HEADER[DIB_V5_HEADER_V_RESOLUTION_INDEX + 1] = 0x21;
-
     }
 
     // Write out the BMP headers in order
@@ -272,7 +326,7 @@ int main (int argc, char *argv[] ) {
             for (unsigned int col = 0 ; col < 60 ; ++col) {
                 // Read in the byte from the bottom rather than the
                 // top of the array, as BMP reverses Amstrad's row order
-                byte = data[(63 - row) * 64 + col];
+                char byte = data[(63 - row) * 64 + col];
                 fputc(byte, bmp_file);
             }
         }
@@ -287,14 +341,14 @@ int main (int argc, char *argv[] ) {
     Write a block of bytes to a file.
 
     - Parameters:
-        - data:   Pointer to a header data.
-        - output: Pointer to open output file record.
-        - count:  Number of bytes in the header data.
+        - data:      Pointer to a header data.
+        - outfile:   Pointer to open output file record.
+        - byteCount: Number of bytes in the header data.
 */
-void output_header_bytes(const char* data, FILE *output, unsigned int count) {
+void output_header_bytes(const char* data, FILE* outfile, unsigned int byteCount) {
 
-    for (unsigned int i = 0 ; i < count ; ++i) {
-        fputc(data[i], output);
+    for (unsigned int i = 0 ; i < byteCount ; ++i) {
+        fputc(data[i], outfile);
     }
 }
 
@@ -309,7 +363,7 @@ void output_header_bytes(const char* data, FILE *output, unsigned int count) {
         - data: Pointer to the raw bit per pixel data.
         - dest: Pointer to the scaled byte per pixel data.
 */
-void scale(char* data, char* dest) {
+void scale(char* source, char* target) {
 
     // Buffer for the bit-per-pixel to byte-per-pixel conversion
     char tmp[UNSCALED_DATA_SIZE] = {0};
@@ -320,7 +374,7 @@ void scale(char* data, char* dest) {
     for (int row = 0 ; row < 64 ; ++row) {
         // Ignore the four-byte alignment padding in the source
         for (int col = 0 ; col < 60 ; ++col) {
-            char byte = data[(63 - row) * 64 + col];
+            char byte = source[(63 - row) * 64 + col];
             for (int bit = 0 ; bit < 8 ; ++bit) {
                 char pixel = (byte & (1 << (7 - bit))) >> (7 - bit);
                 *ptr = pixel > 0 ? 0x01 : 0x00;
@@ -332,7 +386,7 @@ void scale(char* data, char* dest) {
     // Delta values cover the eight bytes neighbouring the destination
     // byte mapped to a byte in the source buffer
     const int delta[9] = {-1441, -1440, -1439, -1, 0, 1, 1439, 1440, 1441};
-    char* destPtr = dest;
+    char* destinationPtr = target;
     ptr = tmp;
 
     for (unsigned int i = 0 ; i < UNSCALED_DATA_SIZE ; ++i) {
@@ -341,15 +395,15 @@ void scale(char* data, char* dest) {
 
         if (i % UNSCALED_WIDTH == 0) {
             // On a new row, so move the pointer on three whole rows
-            destPtr = dest + (((i / UNSCALED_WIDTH) * SCALE_FACTOR) + 1) * SCALED_WIDTH;
+            destinationPtr = target + (((i / UNSCALED_WIDTH) * SCALE_FACTOR) + 1) * SCALED_WIDTH;
         } else {
-            destPtr += 3;
+            destinationPtr += 3;
         }
 
         // Fill in the neighbours in the destination buffer
         for (unsigned int j = 0; j < 9 ; ++j) {
-            char* neighbourPtr = destPtr + delta[j];
-            if (neighbourPtr < dest + SCALED_DATA_SIZE) {
+            char* neighbourPtr = destinationPtr + delta[j];
+            if (neighbourPtr < target + SCALED_DATA_SIZE) {
                 *neighbourPtr = byte;
             }
         }
