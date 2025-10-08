@@ -29,12 +29,26 @@ Grab a screen on the NC100 using **Control**-**Shift**-**S**. This will save a f
 Copy the screenshot to your computer using xmodem transfer, then run:
 
 ```shell
+notepad2bmp {source file path} [bmp file path]
+```
+
+For example:
+
+```shell
 notepad2bmp s.a screenshot.bmp
 ```
 
 **Note** A sample `s.a` file is included in the [`samples`](/samples) directory:
 
 ![Converted sample](./images/nc100.bmp)
+
+The BMP file path is optional: without it, the code will generate a target filename based on the name of the source file. So
+
+```shell
+notepad2bmp screenshot.a
+```
+
+will generate a file named `screenshot.bmp` as its output.
 
 By default, the code upscales the image from 480x64 (72dpi) to 1440x192 (216dpi). If you would prefer to work with the image at its native size, just add the `-r` or `--rawsize` flag:
 
@@ -49,6 +63,10 @@ I've included in the code’s colour look-up data, pixel colouring for that old-
 ![Converted sample in LCD colouring](./images/lcd.bmp)
 
 Just comment out the `WHITE` line in the code, and uncomment the `LCD` line.
+
+## Release Notes
+
+Please see [CHANGELOG.md](CHAMGELOG.md).
 
 ## Legal
 
