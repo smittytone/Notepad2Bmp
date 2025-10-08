@@ -66,7 +66,7 @@ Just comment out the `WHITE` line in the code, and uncomment the `LCD` line.
 
 ## Release Notes
 
-Please see [CHANGELOG.md](CHAMGELOG.md).
+Please see [CHANGELOG.md](CHANGELOG.md).
 
 ## Legal
 
