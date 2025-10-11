@@ -3,7 +3,7 @@
 
     Copyright © 2025 Tony Smith. All rights reserved.
 
-    Version 0.3.0
+    Version 0.4.0
 
     MIT License
     Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -30,6 +30,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <getopt.h>
 
 
 /*
@@ -55,12 +56,19 @@
 #define DIB_V5_HEADER_H_RESOLUTION_INDEX        24
 #define DIB_V5_HEADER_V_RESOLUTION_INDEX        28
 
+#define ERROR_NONE                              0
+#define ERROR_OPEN_SOURCE_FILE                  1
+#define ERROR_OPEN_BMP_FILE                     2
+
 
 /*
     FORWARD DECLARATIONS
 */
 void output_header_bytes(const char* data, FILE *outfile, unsigned int byteCount);
 void scale(char* source, char* destination);
+int  convert(char* inpath, char* outpath, bool do_scale);
+void show_error(int error_code, char* info);
+void show_help(void);
 
 
 /*
@@ -176,173 +184,114 @@ const char BMP_CLT[8] = {
 */
 int main (int argc, char *argv[] ) {
 
-    FILE* source_file = NULL;
-    FILE* bmp_file = NULL;
-    char data[RAW_DATA_SIZE] = {0};
-    // FROM 0.2.0
-    char scaled[SCALED_DATA_SIZE] = {0};
-    bool do_scale = true;
+    // FROM 0.4.0
+    // Replace many original vars
+    char*       source_path = NULL;
+    char*       target_path = NULL;
+    static int  do_scale = 1;
+    bool        do_release_target_path = false;
+    int         option_index = 0;
+    int         short_option = -1;
+    // Prevent error reporting by `getopt_long()`
+                opterr = 0;
+    // Define long options
+    static struct option long_options[] = {
+        {"rawsize", no_argument, &do_scale, 0},
+        {"help", no_argument, 0, 104},
+        {0, 0, 0, 0}
+    };
 
-    // Insufficient args? Print help
+    // Insufficient or too many args? Print help
     if (argc < 2 || argc > 4 ) {
-        printf("notepad2bmp 0.3.0\n");
-        printf("Copyright © 2025, Tony Smith (@smittytone). Source code available under the MIT licence.\n");
-        printf("Usage: notepad2bmp {source filename} [output filename] [--rawsize]\n");
-        printf("If no output filename is provided, the name of the source file is used.\n");
-        printf("If no output filename extension is provided, .bmp is added.\n");
+        show_help();
         exit(0);
     }
 
-    // FROM 0.2.0
-    // Add `-r/--rawsize` switch to disable upscaling
-    if (argc == 4) {
-        for (unsigned int i = 1 ; i < 4 ; ++i) {
-            if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--rawsize") == 0) {
-                do_scale = false;
-                break;
-            }
+    // Process args
+    while (1) {
+        short_option = getopt_long(argc, argv, "rh", long_options, &option_index);
+        if (short_option == -1) break;
+        switch(short_option) {
+            case 'r':
+                do_scale = 0;
+            break;
+            case 'h':
+                show_help();
+                exit(0);
+            break;
+            case '?':
+                printf("[ERROR] Unknown option '%c'\n", optopt);
+                exit(1);
         }
     }
 
-    // Open the source file if we can
-    source_file = fopen (argv[1], "rb");
-    if (source_file == NULL) {
-        printf("[ERROR] File %s not found.\n" , argv[1]);
-        exit (1);
+    // Process positional args, ie. the file paths
+    // TODO Update to handle multiple paths
+    int arg_count = 0;
+    if (optind < argc) {
+        while (optind < argc) {
+            if (arg_count == 0) {
+                source_path = argv[optind++];
+                arg_count++;
+            } else if (arg_count == 1) {
+                target_path = argv[optind++];
+            }
+        }
+    } else {
+        printf("[ERROR] Missing path to source screenshot\n");
+        exit(1);
     }
 
-    // Open the destination file if we can
-    if (argc >= 3) {
+    // Check the target path
+    if (target_path != NULL) {
         // FROM 0.3.0
         // Make sure the supplied destination file name ends in '.bmp'
-        char* bmp_file_name = NULL;
-        bool do_release = false;
-
-        if (strstr(argv[2], ".bmp") == NULL) {
+        if (strstr(target_path, ".bmp") == NULL) {
             // NOTE Above call succeeds on first `.bmp` found, so we'll currently
             //      not come here on files ending in, say, `.bmp.xxx`. We should
             //      really check that the file ENDS in `.bmp`.
 
             // It does not end in '.bmp' so add it
-            bmp_file_name = calloc(strlen(argv[2]) + 5, sizeof(char));
-            strcpy(bmp_file_name, argv[2]);
-            strcpy(&bmp_file_name[strlen(argv[2])], ".bmp");
-            do_release = true;
-        } else {
-            // It does end in '.bmp'
-            bmp_file_name = argv[2];
+            int target_len = strlen(target_path);
+            char* tmp_target_path = calloc(target_len + 5, sizeof(char));
+            do_release_target_path = true;
+            strcpy(tmp_target_path, target_path);
+            strcpy(&tmp_target_path[target_len], ".bmp");
+            target_path = tmp_target_path;
         }
-
-        bmp_file = fopen (bmp_file_name, "wb");
-        if (bmp_file == NULL) {
-            printf("[ERROR] Cannot create file %s.\n" , bmp_file_name);
-            if (do_release) free(bmp_file_name);
-            exit(1);
-        }
-
-        // Release the file name memory if we allocated some for it
-        if (do_release) free(bmp_file_name);
-    }
-
-    // FROM 0.3.0
-    // Use the source file as the basis for the destination file name
-    // if no destination file name is provided
-    if (bmp_file == NULL) {
+    } else {
+        // FROM 0.3.0
+        // Use the source file as the basis for the destination file name
+        // if no destination file name is provided.
         // Determine the length of the source filename minus any extension
         int length = 0;
-        const char* result = strchr(argv[1], '.');
+        const char* result = strchr(source_path, '.');
         if (result != NULL) {
-            length = result - argv[1];
+            length = result - source_path;
         } else {
-            length = strlen(argv[1]);
+            length = strlen(source_path);
         }
 
         // Allocate zeroed memory for the name and write in the source
         // name and then append the standard file extension
-        char* bmp_file_name = calloc(length + 5, sizeof(char));
-        strncpy(bmp_file_name, argv[1], length);
-        strcpy(&bmp_file_name[0] + length, ".bmp");
-
-        // Open up a file with the new file name
-        bmp_file = fopen (bmp_file_name, "wb");
-        if (bmp_file == NULL) {
-            printf("[ERROR] Cannot create file %s.\n" , bmp_file_name);
-            free(bmp_file_name);
-            exit(1);
-        }
-
-        // Free the allocated file name memory
-        free(bmp_file_name);
+        target_path = calloc(length + 5, sizeof(char));
+        do_release_target_path = true;
+        strncpy(target_path, source_path, length);
+        strcpy(&target_path[0] + length, ".bmp");
     }
 
-    // Read in the Amstrad screen grab data
-    for (unsigned int row = 0 ; row < 64 ; ++row) {
-        for (int col = 0 ; col < 60 ; ++col) {
-            data[row * 64 + col] = fgetc(source_file);
-        }
-
-        // Ignore the four NC100 padding bytes per row
-        fgetc(source_file);
-        fgetc(source_file);
-        fgetc(source_file);
-        fgetc(source_file);
+    // FROM 0.4.0
+    // Use the `convert()` function
+    int error = convert(source_path, target_path, do_scale);
+    if (error != 0) {
+        show_error(error, error == ERROR_OPEN_SOURCE_FILE ? source_path : target_path);
     }
 
-    // Close the source file
-    fclose(source_file);
+    // Free the generated-path memory
+    if (do_release_target_path) free(target_path);
 
-    if (do_scale) {
-        // Change BMP header values to match the scaled image
-        unsigned int size = SCALED_DATA_SIZE + BMP_V5_HEADER_DATA_SIZE;
-        BMP_HEADER[BMP_HEADER_FILE_SIZE_INDEX]     = (char)(size & 0xFF);;
-        BMP_HEADER[BMP_HEADER_FILE_SIZE_INDEX + 1] = (char)((size & 0xFF00) >> 8);;
-        BMP_HEADER[BMP_HEADER_FILE_SIZE_INDEX + 2] = (char)((size & 0xFF0000) >> 16);;
-
-        DIB_V5_HEADER[DIB_V5_HEADER_WIDTH_INDEX]      = (char)(SCALED_WIDTH & 0xFF);
-        DIB_V5_HEADER[DIB_V5_HEADER_WIDTH_INDEX + 1]  = (char)((SCALED_WIDTH & 0xFF00) >> 8);
-        DIB_V5_HEADER[DIB_V5_HEADER_HEIGHT_INDEX]     = (char)SCALED_HEIGHT;
-
-        DIB_V5_HEADER[DIB_V5_HEADER_BITS_PER_PIXEL_INDEX] = 8;
-
-        size = SCALED_DATA_SIZE;
-        DIB_V5_HEADER[DIB_V5_HEADER_DATA_SIZE_INDEX]     = (char)(size & 0xFF);
-        DIB_V5_HEADER[DIB_V5_HEADER_DATA_SIZE_INDEX + 1] = (char)((size & 0xFF00) >> 8);
-        DIB_V5_HEADER[DIB_V5_HEADER_DATA_SIZE_INDEX + 2] = (char)((size & 0xFF0000) >> 16);
-
-        DIB_V5_HEADER[DIB_V5_HEADER_H_RESOLUTION_INDEX]     = 0x38;
-        DIB_V5_HEADER[DIB_V5_HEADER_H_RESOLUTION_INDEX + 1] = 0x21;
-        DIB_V5_HEADER[DIB_V5_HEADER_V_RESOLUTION_INDEX]     = 0x38;
-        DIB_V5_HEADER[DIB_V5_HEADER_V_RESOLUTION_INDEX + 1] = 0x21;
-    }
-
-    // Write out the BMP headers in order
-    output_header_bytes(BMP_HEADER, bmp_file, 14);
-    output_header_bytes(DIB_V5_HEADER, bmp_file, 124);
-    output_header_bytes(BMP_CLT, bmp_file, 8);
-
-    if (do_scale) {
-        // Upscale the image using nearest neighbour mode
-        scale(data, scaled);
-
-        // Write out the scaled data
-        for (unsigned int i = 0 ; i < SCALED_DATA_SIZE ; ++i) {
-            fputc(scaled[i], bmp_file);
-        }
-    } else {
-        // Write out the raw data
-        for (unsigned int row = 0 ; row < 64 ; ++row) {
-            // Exclude the padding rows
-            for (unsigned int col = 0 ; col < 60 ; ++col) {
-                // Read in the byte from the bottom rather than the
-                // top of the array, as BMP reverses Amstrad's row order
-                char byte = data[(63 - row) * 64 + col];
-                fputc(byte, bmp_file);
-            }
-        }
-    }
-
-    // Close the file now we're done
-    fclose(bmp_file);
+    // Exit with state
+    exit(error);
 }
 
 
@@ -417,4 +366,138 @@ void scale(char* source, char* target) {
             }
         }
     }
+}
+
+
+/*
+    Convert a single screenshot file to BMP.
+
+    FROM 0.4.0
+
+    - Parameters:
+        - inpath:   Pointer to the path to the source file.
+        - outpath:  Pointer to the path to the destination file.
+        - do_scale: Should the image be scaled too?
+
+    - Returns: 0 on success or an error value.
+ */
+int convert(char* inpath, char* outpath, bool do_scale) {
+
+    char original[RAW_DATA_SIZE] = {0};
+    char scaled[SCALED_DATA_SIZE] = {0};
+    FILE* infile = NULL;
+    FILE* outfile = NULL;
+
+    // Read in the Amstrad screen grab data
+    infile = fopen (inpath, "rb");
+    if (infile == NULL) return ERROR_OPEN_SOURCE_FILE;
+
+    for (unsigned int row = 0 ; row < 64 ; ++row) {
+        for (int col = 0 ; col < 64 ; ++col) {
+            // Ignore the four NC100 padding bytes per row
+            int byte = fgetc(infile);
+            if (col < 60) original[row * 64 + col] = byte;
+        }
+    }
+
+    // Close the source file
+    fclose(infile);
+
+    // Open for output
+    outfile = fopen (outpath, "wb");
+    if (outfile == NULL) return ERROR_OPEN_BMP_FILE;
+
+    if (do_scale) {
+        // Change standard BMP header values to match the scaled image
+        unsigned int size = SCALED_DATA_SIZE + BMP_V5_HEADER_DATA_SIZE;
+        BMP_HEADER[BMP_HEADER_FILE_SIZE_INDEX]     = (char)(size & 0xFF);;
+        BMP_HEADER[BMP_HEADER_FILE_SIZE_INDEX + 1] = (char)((size & 0xFF00) >> 8);;
+        BMP_HEADER[BMP_HEADER_FILE_SIZE_INDEX + 2] = (char)((size & 0xFF0000) >> 16);;
+
+        DIB_V5_HEADER[DIB_V5_HEADER_WIDTH_INDEX]      = (char)(SCALED_WIDTH & 0xFF);
+        DIB_V5_HEADER[DIB_V5_HEADER_WIDTH_INDEX + 1]  = (char)((SCALED_WIDTH & 0xFF00) >> 8);
+        DIB_V5_HEADER[DIB_V5_HEADER_HEIGHT_INDEX]     = (char)SCALED_HEIGHT;
+
+        DIB_V5_HEADER[DIB_V5_HEADER_BITS_PER_PIXEL_INDEX] = 8;
+
+        size = SCALED_DATA_SIZE;
+        DIB_V5_HEADER[DIB_V5_HEADER_DATA_SIZE_INDEX]     = (char)(size & 0xFF);
+        DIB_V5_HEADER[DIB_V5_HEADER_DATA_SIZE_INDEX + 1] = (char)((size & 0xFF00) >> 8);
+        DIB_V5_HEADER[DIB_V5_HEADER_DATA_SIZE_INDEX + 2] = (char)((size & 0xFF0000) >> 16);
+
+        DIB_V5_HEADER[DIB_V5_HEADER_H_RESOLUTION_INDEX]     = 0x38;
+        DIB_V5_HEADER[DIB_V5_HEADER_H_RESOLUTION_INDEX + 1] = 0x21;
+        DIB_V5_HEADER[DIB_V5_HEADER_V_RESOLUTION_INDEX]     = 0x38;
+        DIB_V5_HEADER[DIB_V5_HEADER_V_RESOLUTION_INDEX + 1] = 0x21;
+    }
+
+    // Write out the BMP headers in order
+    output_header_bytes(BMP_HEADER, outfile, 14);
+    output_header_bytes(DIB_V5_HEADER, outfile, 124);
+    output_header_bytes(BMP_CLT, outfile, 8);
+
+    if (do_scale) {
+        // Upscale the image using nearest neighbour mode
+        scale(original, scaled);
+
+        // Write out the scaled data
+        for (unsigned int i = 0 ; i < SCALED_DATA_SIZE ; ++i) {
+            fputc(scaled[i], outfile);
+        }
+    } else {
+        // Write out the raw data
+        for (unsigned int row = 0 ; row < 64 ; ++row) {
+            // Exclude the padding rows
+            for (unsigned int col = 0 ; col < 60 ; ++col) {
+                // Read in the byte from the bottom rather than the
+                // top of the array, as BMP reverses Amstrad's row order
+                uint8_t byte = original[(63 - row) * 64 + col];
+                fputc(byte, outfile);
+            }
+        }
+    }
+
+    // Close the file now we're done
+    fclose(outfile);
+
+    return ERROR_NONE;
+}
+
+
+/*
+    Display an error message.
+
+    FROM 0.4.0
+
+    - Parameters:
+        - error_code: The error to report.
+        - info:       Pointer to extra message data
+*/
+void show_error(int error_code, char* info) {
+
+    switch(error_code) {
+        case ERROR_OPEN_SOURCE_FILE:
+            printf("ERROR] Could not open Amstrad screenshot file %s\n", info);
+            break;
+        case ERROR_OPEN_BMP_FILE:
+            printf("ERROR] Could not create BMP file %s\n", info);
+            break;
+        default:
+            printf("ERROR] Unknown.\n");
+    }
+}
+
+
+/*
+    Display help info.
+
+    FROM 0.4.0
+*/
+void show_help(void) {
+
+    printf("notepad2bmp 0.4.0\n");
+    printf("Copyright © 2025, Tony Smith (@smittytone). Source code available under the MIT licence.\n\n");
+    printf("Usage: notepad2bmp {source filename} [output filename] [-r/--rawsize]\n\n");
+    printf("If no output filename is provided, the name of the source file is used.\n");
+    printf("If no output filename extension is provided, .bmp is added.\n");
 }
