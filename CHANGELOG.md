@@ -1,5 +1,8 @@
 # Release Notes
 
+- 0.4.0
+    - Migrate arg parsing to `getopt_long()`.
+    - Separate out conversion code into a function.
 - 0.3.0
     - Auto generate output filename from source filename when not included.
     - Add .bmp to output filename if not included.
