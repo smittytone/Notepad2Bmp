@@ -189,16 +189,16 @@ int main (int argc, char *argv[] ) {
     char*       source_path = NULL;
     char*       target_path = NULL;
     static int  do_scale = 1;
-    bool        do_release_target_path = false;
     int         option_index = 0;
     int         short_option = -1;
+    bool        do_free_target_path = false;
     // Prevent error reporting by `getopt_long()`
                 opterr = 0;
     // Define long options
     static struct option long_options[] = {
         {"rawsize", no_argument, &do_scale, 0},
-        {"help", no_argument, 0, 104},
-        {0, 0, 0, 0}
+        {"help", no_argument, NULL, 'h'},
+        {0, 0, NULL, 0}
     };
 
     // Insufficient or too many args? Print help
@@ -254,7 +254,7 @@ int main (int argc, char *argv[] ) {
             // It does not end in '.bmp' so add it
             int target_len = strlen(target_path);
             char* tmp_target_path = calloc(target_len + 5, sizeof(char));
-            do_release_target_path = true;
+            do_free_target_path = true;
             strcpy(tmp_target_path, target_path);
             strcpy(&tmp_target_path[target_len], ".bmp");
             target_path = tmp_target_path;
@@ -275,7 +275,7 @@ int main (int argc, char *argv[] ) {
         // Allocate zeroed memory for the name and write in the source
         // name and then append the standard file extension
         target_path = calloc(length + 5, sizeof(char));
-        do_release_target_path = true;
+        do_free_target_path = true;
         strncpy(target_path, source_path, length);
         strcpy(&target_path[0] + length, ".bmp");
     }
@@ -288,7 +288,7 @@ int main (int argc, char *argv[] ) {
     }
 
     // Free the generated-path memory
-    if (do_release_target_path) free(target_path);
+    if (do_free_target_path) free(target_path);
 
     // Exit with state
     exit(error);
@@ -498,6 +498,6 @@ void show_help(void) {
     printf("notepad2bmp 0.4.0\n");
     printf("Copyright © 2025, Tony Smith (@smittytone). Source code available under the MIT licence.\n\n");
     printf("Usage: notepad2bmp {source filename} [output filename] [-r/--rawsize]\n\n");
-    printf("If no output filename is provided, the name of the source file is used.\n");
-    printf("If no output filename extension is provided, .bmp is added.\n");
+    printf("Notes: If no output filename is provided, the name of the source file is used.\n");
+    printf("       If no output filename extension is provided, .bmp is added.\n");
 }
