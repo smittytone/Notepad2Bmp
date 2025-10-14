@@ -1,4 +1,4 @@
-# Notepad2Bmp
+# Notepad2Bmp 0.4.0
 
 Convert Amstrad NC100 Notepad screenshots to a more useful format: BMP. These can then be scaled in almost any modern graphics package and manipulated as required.
 
